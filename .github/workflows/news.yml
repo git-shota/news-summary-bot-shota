@@ -22,7 +22,7 @@ jobs:
         run: pip install feedparser beautifulsoup4 openai requests
 
       - name: Run news script
-        run: python send_news.py
+        run: python main.py
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
