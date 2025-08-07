@@ -1,99 +1,70 @@
-# main.py
+# send_news.py
+import os
 import feedparser
-import openai
 import requests
 from bs4 import BeautifulSoup
-import os
+import openai
+import smtplib
+from email.mime.text import MIMEText
 
-# 環境変数からAPIキーを取得
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-LINE_NOTIFY_TOKEN = os.getenv("LINE_NOTIFY_TOKEN")
+def fetch_rss_entries(feed_url, max_items=3):
+    feed = feedparser.parse(feed_url)
+    return feed.entries[:max_items]
 
-# ニュース本文を取得（Yahooニュース用の簡易スクレイピング）
-def fetch_article_text(url):
+def fetch_article_body(url):
     try:
-        res = requests.get(url)
-        soup = BeautifulSoup(res.text, "html.parser")
-        # Yahooニュースの本文は article tag にある
-        article = soup.find("article")
-        if article:
-            return article.get_text(strip=True)
-        return ""
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, 'html.parser')
+
+        # このセレクタはサイトにより調整が必要
+        article = soup.select_one("div.articleBody") or soup.select_one("div.article-body")
+        return article.get_text(strip=True) if article else "本文を取得できませんでした。"
     except Exception as e:
-        return ""
+        return f"本文取得エラー: {e}"
 
-# RSSフィードから上位ニュースを取得
-def get_top_news():
-    rss_url = "https://news.yahoo.co.jp/rss/media/top/all.xml"
-    feed = feedparser.parse(rss_url)
-    return feed.entries[:5]
+def summarize(text):
+    openai.api_key = os.getenv("OPENAI_API_KEY")
+    prompt = f"以下のニュース記事を3行で簡潔に要約してください：\n{text}"
+    try:
+        res = openai.ChatCompletion.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.5,
+        )
+        return res.choices[0].message.content.strip()
+    except Exception as e:
+        return f"要約エラー: {e}"
 
-# OpenAIで要約生成
-def summarize_text(text):
-    openai.api_key = OPENAI_API_KEY
-    prompt = f"次のニュース本文を200文字以内でわかりやすく要約してください：\n{text}"
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    return response.choices[0].message.content.strip()
+def send_email(subject, body):
+    from_addr = os.getenv("GMAIL_USER")
+    to_addr = os.getenv("GMAIL_USER")
+    password = os.getenv("GMAIL_PASS")
 
-# LINEに通知
-def send_line_notify(message):
-    url = "https://notify-api.line.me/api/notify"
-    headers = {"Authorization": f"Bearer {LINE_NOTIFY_TOKEN}"}
-    data = {"message": message}
-    requests.post(url, headers=headers, data=data)
+    msg = MIMEText(body)
+    msg['Subject'] = subject
+    msg['From'] = from_addr
+    msg['To'] = to_addr
 
-# メイン処理
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        server.login(from_addr, password)
+        server.send_message(msg)
+
 def main():
-    entries = get_top_news()
-    messages = ["\U0001F4F0 今日の人気ニュース要約\n"]
+    feed_url = "https://news.yahoo.co.jp/rss/topics/top-picks.xml"
+    entries = fetch_rss_entries(feed_url)
+    
+    email_body = ""  # 本文にまとめて記載
 
     for entry in entries:
-        article_text = fetch_article_text(entry.link)
-        content_to_summarize = article_text if article_text else entry.title
-        summary = summarize_text(content_to_summarize)
-        messages.append(f"\n🔹 {entry.title}\n{summary}\n{entry.link}\n")
+        title = entry.title
+        link = entry.link
+        article = fetch_article_body(link)
+        summary = summarize(article)
 
-    send_line_notify("\n".join(messages))
+        email_body += f"\n\n📰 {title}\n🔗 {link}\n📝 要約:\n{summary}\n"
+
+    send_email("本日のニュース要約", email_body)
 
 if __name__ == "__main__":
     main()
-
-
-# requirements.txt
-openai
-requests
-feedparser
-beautifulsoup4
-
-
-# .github/workflows/news.yml
-name: Daily News Summary
-
-on:
-  schedule:
-    - cron: '0 10 * * *'  # 日本時間19時（UTCで10時）
-  workflow_dispatch:
-
-jobs:
-  run:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Run script
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
-        run: python main.py
