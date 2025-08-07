@@ -1,27 +1,29 @@
-name: Daily News Summary
+name: Daily News Email
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # 日本時間19時（UTCで10時）
-  workflow_dispatch:  # 手動でも実行できるようにする
+    - cron: '0 10 * * *'  # JST 19:00（UTC 10:00）
+  workflow_dispatch:
 
 jobs:
-  run:
+  send:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v3
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: 3.10
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install feedparser beautifulsoup4 openai requests
 
-      - name: Run script
+      - name: Run news script
+        run: python send_news.py
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
-        run: python main.py
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
