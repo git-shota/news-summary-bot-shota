@@ -1,7 +1,8 @@
 news:
-  rss_url: "https://news.yahoo.co.jp/pickup/rss.xml"
+  rss_url: "https://news.yahoo.co.jp/rss/topics/top-picks.xml"
+  ranking_rss_url: "https://news.yahoo.co.jp/rss/topics/top-picks.xml"  # 実際はアクセスランキング用RSSに変更
   num_articles: 5
   keywords:
     - AI
     - 経済
-    - テック
+    - テクノロジー
