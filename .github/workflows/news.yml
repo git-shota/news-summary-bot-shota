@@ -24,4 +24,7 @@ jobs:
       - name: Run news script
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+
         run: python main.py
