@@ -56,11 +56,39 @@ def summarize(title, link):
     )
     return resp.choices[0].message.content.strip()
 
+# --- 類似判定（簡易） ---
+def is_similar(text1, text2, threshold=0.5):
+    # 簡単に共通単語率で判定（要調整）
+    words1 = set(text1.lower().split())
+    words2 = set(text2.lower().split())
+    if not words1 or not words2:
+        return False
+    common = words1.intersection(words2)
+    similarity = len(common) / min(len(words1), len(words2))
+    return similarity > threshold
+
+# --- 重複除外しつつ記事を5件に補充 ---
+def filter_and_fill(articles, num_articles):
+    summaries = []
+    filtered_articles = []
+
+    for article in articles:
+        summary = summarize(article.title, article.link)
+        # 似ている要約があればスキップ
+        if any(is_similar(summary, s) for s in summaries):
+            continue
+        summaries.append(summary)
+        filtered_articles.append((article, summary))
+        if len(filtered_articles) >= num_articles:
+            break
+
+    return filtered_articles, summaries
+
 # --- メール送信 ---
 def send_email(subject, body):
     msg = MIMEMultipart()
     msg["From"] = GMAIL_USER
-    msg["To"] = GMAIL_USER
+    msg["To"] = MAIL_TO
     msg["Subject"] = subject
 
     msg.attach(MIMEText(body, "plain", "utf-8"))
@@ -71,18 +99,28 @@ def send_email(subject, body):
 
 # --- メイン処理 ---
 def main():
-    # まず通常記事を取得
-    articles = fetch_news(NEWS_RSS_URL, KEYWORDS, NUM_ARTICLES)
+    # まず通常記事を取得（多めに取ると良いです）
+    articles = fetch_news(NEWS_RSS_URL, KEYWORDS, NUM_ARTICLES * 3)
 
-    # 0件の場合はランキングRSSにフォールバック
-    if not articles:
-        print("該当する記事がないため、閲覧数Top5にフォールバックします。")
-        articles = fetch_news(RANKING_RSS_URL, None, NUM_ARTICLES)
+    # 重複除外して5件に絞る
+    filtered_articles, summaries = filter_and_fill(articles, NUM_ARTICLES)
 
-    # 要約して本文生成
+    # 5件に満たない場合はランキング記事で補充
+    if len(filtered_articles) < NUM_ARTICLES:
+        print(f"{len(filtered_articles)}件しか記事がなかったのでランキング記事で補充します。")
+        ranking_articles = fetch_news(RANKING_RSS_URL, None, NUM_ARTICLES * 3)
+        for article in ranking_articles:
+            if len(filtered_articles) >= NUM_ARTICLES:
+                break
+            summary = summarize(article.title, article.link)
+            if any(is_similar(summary, s) for s in summaries):
+                continue
+            summaries.append(summary)
+            filtered_articles.append((article, summary))
+
+    # 本文作成
     body = ""
-    for a in articles:
-        summary = summarize(a.title, a.link)
+    for a, summary in filtered_articles:
         body += f"📰 {a.title}\nURL: {a.link}\n要約: {summary}\n\n"
 
     # メール送信
