@@ -16,6 +16,7 @@ RSS_URLS = config["news"]["rss_urls"]  # 複数RSS
 RANKING_RSS_URL = config["news"]["ranking_rss_url"]
 NUM_ARTICLES = config["news"]["num_articles"]
 KEYWORDS = [k.lower() for k in config["news"]["keywords"]]
+PROMPT_TEMPLATE = config["news"]["prompt_template"]
 
 # メール設定
 GMAIL_USER = os.getenv("GMAIL_USER")
@@ -59,9 +60,9 @@ def fetch_news(rss_url, keywords=None, num_articles=5):
 
 # --- 要約 ---
 def summarize(title, link):
-    prompt = f"以下のニュースを簡潔に要約してください。\n\nタイトル: {title}\nURL: {link}"
+    prompt = PROMPT_TEMPLATE.format(title=title, link=link)
     resp = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5",
         messages=[
             {"role": "system", "content": "あなたは優秀なニュース要約アシスタントです。"},
             {"role": "user", "content": prompt}
