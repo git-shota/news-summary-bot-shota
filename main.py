@@ -26,7 +26,7 @@ MAIL_TO = GMAIL_USER
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # --- ニュース取得 ---
-def fetch_news(rss_url, keywords=None, num_articles=5):
+def fetch_news(rss_url, keywords=KEYWORDS, num_articles=NUM_ARTICLES):
     feed = feedparser.parse(rss_url)
     entries = feed.entries
 
