@@ -12,8 +12,8 @@ def load_config(path="config.yml"):
         return yaml.safe_load(f)
 
 config = load_config()
-NEWS_RSS_URL = config["news"]["rss_url"]  # 通常記事
-RANKING_RSS_URL = config["news"]["ranking_rss_url"]  # 閲覧数ランキング記事
+RSS_URLS = config["news"]["rss_urls"]  # 複数RSS
+RANKING_RSS_URL = config["news"]["ranking_rss_url"]
 NUM_ARTICLES = config["news"]["num_articles"]
 KEYWORDS = [k.lower() for k in config["news"]["keywords"]]
 
@@ -25,20 +25,33 @@ MAIL_TO = GMAIL_USER
 # --- OpenAIクライアント ---
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# --- ニュース取得 ---
-def fetch_news(rss_url, keywords=KEYWORDS, num_articles=NUM_ARTICLES):
+# --- ニュース取得（複数RSS対応） ---
+def fetch_multiple_news(rss_urls, keywords=KEYWORDS, num_articles=NUM_ARTICLES*3):
+    all_entries = []
+    for url in rss_urls:
+        feed = feedparser.parse(url)
+        entries = feed.entries
+        all_entries.extend(entries)
+
+    # キーワードフィルタ
+    if keywords:
+        filtered = [e for e in all_entries if any(k in e.title.lower() for k in keywords)]
+        if not filtered:
+            filtered = all_entries
+    else:
+        filtered = all_entries
+
+    return filtered[:num_articles]
+
+# --- 既存のfetch_newsもranking用で残す ---
+def fetch_news(rss_url, keywords=None, num_articles=5):
     feed = feedparser.parse(rss_url)
     entries = feed.entries
 
-    # キーワードでフィルタ
     filtered = []
     if keywords:
-        filtered = [
-            e for e in entries
-            if any(k in e.title.lower() for k in keywords)
-        ]
+        filtered = [e for e in entries if any(k in e.title.lower() for k in keywords)]
 
-    # キーワードが無い場合やヒットしない場合は全件
     if not filtered:
         filtered = entries
 
@@ -58,7 +71,6 @@ def summarize(title, link):
 
 # --- 類似判定（簡易） ---
 def is_similar(text1, text2, threshold=0.5):
-    # 簡単に共通単語率で判定（要調整）
     words1 = set(text1.lower().split())
     words2 = set(text2.lower().split())
     if not words1 or not words2:
@@ -74,7 +86,6 @@ def filter_and_fill(articles, num_articles):
 
     for article in articles:
         summary = summarize(article.title, article.link)
-        # 似ている要約があればスキップ
         if any(is_similar(summary, s) for s in summaries):
             continue
         summaries.append(summary)
@@ -99,13 +110,10 @@ def send_email(subject, body):
 
 # --- メイン処理 ---
 def main():
-    # まず通常記事を取得（多めに取ると良いです）
-    articles = fetch_news(NEWS_RSS_URL, KEYWORDS, NUM_ARTICLES * 3)
+    articles = fetch_multiple_news(RSS_URLS, KEYWORDS, NUM_ARTICLES * 3)
 
-    # 重複除外して5件に絞る
     filtered_articles, summaries = filter_and_fill(articles, NUM_ARTICLES)
 
-    # 5件に満たない場合はランキング記事で補充
     if len(filtered_articles) < NUM_ARTICLES:
         print(f"{len(filtered_articles)}件しか記事がなかったのでランキング記事で補充します。")
         ranking_articles = fetch_news(RANKING_RSS_URL, None, NUM_ARTICLES * 3)
@@ -118,16 +126,13 @@ def main():
             summaries.append(summary)
             filtered_articles.append((article, summary))
 
-    # 本文作成
     body = ""
-
-    if KEYWORDS and not hit_by_keyword:
+    if KEYWORDS and not any(any(k in a.title.lower() for k in KEYWORDS) for a, _ in filtered_articles):
         body += "⚠️ キーワードにヒットする記事がありませんでした。\n\n"
 
     for a, summary in filtered_articles:
         body += f"📰 {a.title}\nURL: {a.link}\n要約: {summary}\n\n"
 
-    # メール送信
     send_email("本日のニュース要約", body)
     print("メール送信完了")
 
