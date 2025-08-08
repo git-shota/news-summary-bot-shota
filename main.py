@@ -17,12 +17,38 @@ KEYWORDS = [k.lower() for k in config["news"]["keywords"]]
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # --- ニュース取得 ---
+import feedparser
+import yaml
+
+CONFIG_FILE = "config.yaml"
+RSS_URL = "https://news.yahoo.co.jp/rss/topics/top-picks.xml"
+
+# 設定読み込み
+with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+    config = yaml.safe_load(f)
+
+KEYWORDS = [kw.lower() for kw in config.get("keywords", [])]
+NUM_ARTICLES = config.get("num_articles", 5)
+
 def fetch_news():
     feed = feedparser.parse(RSS_URL)
     entries = feed.entries
+
+    # キーワードが設定されている場合はフィルタリング
+    filtered = []
     if KEYWORDS:
-        entries = [e for e in entries if any(k in e.title.lower() for k in KEYWORDS)]
-    return entries[:NUM_ARTICLES]
+        filtered = [
+            e for e in entries
+            if any(k in e.title.lower() for k in KEYWORDS)
+        ]
+
+    # キーワードでヒットしなかった場合はフォールバック
+    if not filtered:
+        print("キーワードに該当する記事がないため、全件から取得します。")
+        filtered = entries
+
+    # 上位NUM_ARTICLES件を返す
+    return filtered[:NUM_ARTICLES]
 
 # --- 要約 ---
 def summarize(title, link):
