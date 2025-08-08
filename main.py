@@ -4,7 +4,7 @@ import yaml
 from openai import OpenAI
 
 # --- 設定読み込み ---
-def load_config(path="config.yaml"):
+def load_config(path="config.yml"):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
