@@ -1,29 +1,27 @@
-name: Daily News Email
+name: Send Daily News
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # JST 19:00（UTC 10:00）
+    - cron: "0 10 * * *" # 毎日19時(JST)に実行（UTC10時）
   workflow_dispatch:
 
 jobs:
-  send:
+  send-news:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install feedparser beautifulsoup4 openai requests
+        run: |
+          pip install feedparser pyyaml openai
 
       - name: Run news script
-        run: python main.py
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_PASS: ${{ secrets.GMAIL_PASS }}
+        run: python main.py
