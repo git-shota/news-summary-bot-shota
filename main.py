@@ -120,6 +120,10 @@ def main():
 
     # 本文作成
     body = ""
+
+    if KEYWORDS and not hit_by_keyword:
+        body += "⚠️ キーワードにヒットする記事がありませんでした。\n\n"
+
     for a, summary in filtered_articles:
         body += f"📰 {a.title}\nURL: {a.link}\n要約: {summary}\n\n"
 
