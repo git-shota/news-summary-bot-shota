@@ -2,6 +2,7 @@ name: Send Daily News
 
 on:
   schedule:
+    - cron: "0 23 * * *" # 毎日8時(JST)に実行（UTC23時）
     - cron: "0 10 * * *" # 毎日19時(JST)に実行（UTC10時）
   workflow_dispatch:
 
