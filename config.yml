@@ -1,0 +1,7 @@
+news:
+  rss_url: "https://news.yahoo.co.jp/pickup/rss.xml"
+  num_articles: 5
+  keywords:
+    - AI
+    - 経済
+    - テック
