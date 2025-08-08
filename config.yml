@@ -8,3 +8,9 @@ news:
   num_articles: 5
   keywords:
     - AI
+  prompt_template: |
+    以下のニュースについて、簡潔に要約してください。
+    さらに、そのニュースの背景や関連情報もわかりやすく説明してください。
+
+    ニュースタイトル: {title}
+    URL: {link}
