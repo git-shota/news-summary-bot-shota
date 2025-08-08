@@ -20,7 +20,7 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 import feedparser
 import yaml
 
-CONFIG_FILE = "config.yaml"
+CONFIG_FILE = "config.yml"
 RSS_URL = "https://news.yahoo.co.jp/rss/topics/top-picks.xml"
 
 # 設定読み込み
